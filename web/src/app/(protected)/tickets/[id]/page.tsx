@@ -357,8 +357,7 @@ export default function TicketDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 text-gray-900 md:p-6 dark:bg-zinc-950 dark:text-zinc-100">
-      <div className="mx-auto max-w-5xl space-y-4">
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => router.push('/tickets')}
@@ -740,6 +739,5 @@ export default function TicketDetailPage() {
           )}
         </section>
       </div>
-    </main>
   );
 }

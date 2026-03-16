@@ -93,8 +93,7 @@ export default function MetricsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 text-gray-900 md:p-6 dark:bg-zinc-950 dark:text-zinc-100">
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">
@@ -105,13 +104,8 @@ export default function MetricsPage() {
             </p>
           </div>
 
+
           <div className="flex gap-2">
-            <button
-              onClick={() => router.push('/tickets')}
-              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-            >
-              ← Volver a tickets
-            </button>
             <button
               onClick={loadMetrics}
               className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
@@ -175,6 +169,5 @@ export default function MetricsPage() {
           </>
         )}
       </div>
-    </main>
   );
 }
