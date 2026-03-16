@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useMemo, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
@@ -60,6 +60,14 @@ const PRIORITY_LABELS: Record<string, string> = {
   HIGH: 'Alta',
 };
 
+const ALLOWED_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
+  OPEN: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['WAITING_USER', 'CLOSED', 'CANCELLED'],
+  WAITING_USER: ['IN_PROGRESS', 'CLOSED', 'CANCELLED'],
+  CLOSED: [],
+  CANCELLED: [],
+};
+
 export default function TicketDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -76,6 +84,30 @@ export default function TicketDetailPage() {
   const [messageVisibility, setMessageVisibility] = useState<'PUBLIC' | 'INTERNAL'>('PUBLIC');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+
+  const [nextStatus, setNextStatus] = useState<TicketStatus | ''>('');
+  const [statusReason, setStatusReason] = useState('');
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const allowedNextStatuses = useMemo(() => {
+    if (!ticket) return [];
+    return ALLOWED_STATUS_TRANSITIONS[ticket.status] ?? [];
+  }, [ticket]);
+
+  useEffect(() => {
+    if (!allowedNextStatuses.length) {
+      setNextStatus('');
+      return;
+    }
+
+    setNextStatus((prev) => {
+      if (prev && allowedNextStatuses.includes(prev as TicketStatus)) {
+        return prev;
+      }
+      return allowedNextStatuses[0];
+    });
+  }, [allowedNextStatuses]);
 
   async function loadData() {
     setLoading(true);
@@ -150,6 +182,42 @@ export default function TicketDetailPage() {
       setMessageError(err instanceof Error ? err.message : 'No se pudo enviar el mensaje');
     } finally {
       setSendingMessage(false);
+    }
+  }
+
+  async function onSubmitStatus(e: FormEvent) {
+    e.preventDefault();
+
+    if (!ticket) return;
+    if (!nextStatus) return;
+
+    setChangingStatus(true);
+    setStatusError(null);
+
+    try {
+      await apiFetch(`/tickets/${ticket.id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({
+          toStatus: nextStatus,
+          reason: statusReason.trim() || undefined,
+        }),
+      });
+
+      setStatusReason('');
+      await loadData(); // recarga detalle + timeline
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'No se pudo cambiar el estado';
+
+      if (message.toLowerCase().includes('unauthorized')) {
+        clearToken();
+        router.push('/login');
+        return;
+      }
+
+      setStatusError(message);
+    } finally {
+      setChangingStatus(false);
     }
   }
 
@@ -260,6 +328,84 @@ export default function TicketDetailPage() {
             </div>
           </div>
         </section>
+
+        {currentUser && currentUser.role !== 'USER' && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100">
+                Cambiar estado
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-zinc-400">
+                Gestioná el workflow del ticket desde el frontend.
+              </p>
+            </div>
+
+            {allowedNextStatuses.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-300">
+                Este ticket está en estado final ({STATUS_LABELS[ticket.status] ?? ticket.status}) y no tiene transiciones disponibles.
+              </div>
+            ) : (
+              <form onSubmit={onSubmitStatus} className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-zinc-200">
+                    Nuevo estado
+                  </label>
+                  <select
+                    value={nextStatus}
+                    onChange={(e) => setNextStatus(e.target.value as TicketStatus)}
+                    className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:ring focus:ring-gray-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:ring-zinc-700"
+                  >
+                    {allowedNextStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {STATUS_LABELS[status] ?? status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-800 dark:text-zinc-200">
+                    Motivo (opcional)
+                  </label>
+                  <textarea
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                    rows={3}
+                    placeholder="Ej: Tomado por soporte para análisis"
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 outline-none focus:ring focus:ring-gray-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:ring-zinc-700"
+                  />
+                </div>
+
+                {statusError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                    {statusError}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={changingStatus || !nextStatus}
+                    className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    {changingStatus ? 'Actualizando...' : 'Cambiar estado'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusReason('');
+                      setStatusError(null);
+                    }}
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+        )}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="mb-4">
