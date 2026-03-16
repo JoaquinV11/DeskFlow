@@ -92,10 +92,21 @@ export default function TicketsPage() {
   return (
       <div className="space-y-4">
 
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Tickets</h1>
-        <p className="text-sm text-gray-600 dark:text-zinc-400">Listado de tickets (DeskFlow)</p>
-      </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-zinc-100">Tickets</h1>
+            <p className="text-sm text-gray-600 dark:text-zinc-400">Listado de tickets (DeskFlow)</p>
+          </div>
+
+          {currentUser && currentUser.role !== 'AGENT' && (
+            <button
+              onClick={() => router.push('/tickets/new')}
+              className="self-start rounded-xl bg-black px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+            >
+              + Nuevo ticket
+            </button>
+          )}
+        </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="grid gap-3 md:grid-cols-[220px_1fr_auto]">
