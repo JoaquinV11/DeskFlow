@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  CLOSED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum EventType {
+  CREATED
+  MESSAGE // comentario público o nota interna (según visibility)
+  STATUS_CHANGED
+  ASSIGNED
+  TAG_ADDED
+  TAG_REMOVED
+  ATTACHMENT_ADDED
+  AI_SUMMARY
+}
+
+enum EventVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ticketsCreated  Ticket[] @relation("TicketCreator")
+  ticketsAssigned Ticket[] @relation("TicketAssignee")
+
+  events              TicketEvent[]
+  attachmentsUploaded Attachment[] // <-- agregar esto
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  tickets Ticket[]
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  ticketTags   TicketTag[]
+  ticketEvents TicketEvent[]
+}
+
+model TicketTag {
+  ticketId String
+  tagId    String
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([ticketId, tagId])
+  @@index([tagId])
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  title       String
+  description String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+
+  creatorId String
+  creator   User   @relation("TicketCreator", fields: [creatorId], references: [id])
+
+  assignedToId String?
+  assignedTo   User?   @relation("TicketAssignee", fields: [assignedToId], references: [id])
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  closedAt    DateTime?
+  cancelledAt DateTime?
+
+  events      TicketEvent[]
+  ticketTags  TicketTag[]
+  attachments Attachment[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([creatorId])
+  @@index([assignedToId])
+  @@index([categoryId])
+}
+
+model TicketEvent {
+  id       String @id @default(cuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  type       EventType
+  visibility EventVisibility @default(PUBLIC)
+
+  // Para MESSAGE / AI_SUMMARY / reasons
+  message String?
+
+  // Para STATUS_CHANGED
+  fromStatus TicketStatus?
+  toStatus   TicketStatus?
+
+  // Para ASSIGNED
+  fromAssigneeId String?
+  toAssigneeId   String?
+
+  // Para TAG events
+  tagId String?
+  tag   Tag?    @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([type])
+  @@index([visibility])
+}
+
+model Attachment {
+  id       String @id @default(cuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  filename  String
+  mimeType  String
+  sizeBytes Int
+  url       String
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
