@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { clearToken, getToken, type CurrentUser } from '@/lib/auth';
 import type { PaginatedTickets } from '@/lib/types';
+import StatusBadge from '@/components/StatusBadge';
+import PriorityBadge from '@/components/PriorityBadge';
 
 const STATUS_LABELS: Record<string, string> = {
   OPEN: 'Abierto',
@@ -189,12 +191,17 @@ export default function TicketsPage() {
                             {ticket.description}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-900 dark:text-zinc-100">
-                          {STATUS_LABELS[ticket.status] ?? ticket.status}
-                        </td>
-                        <td className="px-4 py-3 text-gray-900 dark:text-zinc-100">
-                          {PRIORITY_LABELS[ticket.priority] ?? ticket.priority}
-                        </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <StatusBadge status={ticket.status} />
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <PriorityBadge priority={ticket.priority} />
+                            </div>
+                          </td>
                         <td className="px-4 py-3 text-gray-900 dark:text-zinc-100">
                           {ticket.assignedTo ? ticket.assignedTo.name : '—'}
                         </td>

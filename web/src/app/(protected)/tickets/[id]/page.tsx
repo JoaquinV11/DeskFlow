@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
+import StatusBadge from '@/components/StatusBadge';
+import PriorityBadge from '@/components/PriorityBadge';
 
 type Role = 'USER' | 'AGENT' | 'ADMIN';
 type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'CLOSED' | 'CANCELLED';
@@ -384,12 +386,8 @@ export default function TicketDetailPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                Estado: {STATUS_LABELS[ticket.status] ?? ticket.status}
-              </span>
-              <span className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                Prioridad: {PRIORITY_LABELS[ticket.priority] ?? ticket.priority}
-              </span>
+              <StatusBadge status={ticket.status} />
+              <PriorityBadge priority={ticket.priority} />
             </div>
           </div>
 
