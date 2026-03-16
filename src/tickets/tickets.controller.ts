@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
+import { ChangeTicketStatusDto } from './dto/change-ticket-status.dto';
 
 @Controller('tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -48,6 +49,16 @@ export class TicketsController {
     @Req() req: any,
   ) {
     return this.ticketsService.assign(id, dto, req.user);
+  }
+
+  @Post(':id/status')
+  @Roles('AGENT', 'ADMIN')
+  changeStatus(
+    @Param('id') id: string,
+    @Body() dto: ChangeTicketStatusDto,
+    @Req() req: any,
+  ) {
+    return this.ticketsService.changeStatus(id, dto, req.user);
   }
 
   @Get(':id')

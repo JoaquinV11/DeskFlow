@@ -13,6 +13,17 @@ type CurrentUser = {
   role: 'USER' | 'AGENT' | 'ADMIN';
 };
 
+const ALLOWED_STATUS_TRANSITIONS: Record<
+  'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'CLOSED' | 'CANCELLED',
+  Array<'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'CLOSED' | 'CANCELLED'>
+> = {
+  OPEN: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['WAITING_USER', 'CLOSED', 'CANCELLED'],
+  WAITING_USER: ['IN_PROGRESS', 'CLOSED', 'CANCELLED'],
+  CLOSED: [],
+  CANCELLED: [],
+};
+
 @Injectable()
 export class TicketsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -249,6 +260,78 @@ export class TicketsService {
         },
         _count: {
           select: { events: true },
+        },
+      },
+    });
+
+    return updatedTicket;
+  }
+
+  async changeStatus(
+    ticketId: string,
+    dto: { toStatus: 'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'CLOSED' | 'CANCELLED'; reason?: string },
+    currentUser: CurrentUser,
+  ) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        status: true,
+        creatorId: true,
+        assignedToId: true,
+        closedAt: true,
+        cancelledAt: true,
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+
+    if (ticket.status === dto.toStatus) {
+      throw new BadRequestException('El ticket ya está en ese estado');
+    }
+
+    const allowed = ALLOWED_STATUS_TRANSITIONS[ticket.status as keyof typeof ALLOWED_STATUS_TRANSITIONS] ?? [];
+    if (!allowed.includes(dto.toStatus)) {
+      throw new BadRequestException(
+        `Transición inválida: ${ticket.status} -> ${dto.toStatus}`,
+      );
+    }
+
+    // (Opcional, pero útil): para pasar a IN_PROGRESS pedimos asignación
+    if (dto.toStatus === 'IN_PROGRESS' && !ticket.assignedToId) {
+      throw new BadRequestException('No se puede pasar a IN_PROGRESS sin un responsable asignado');
+    }
+
+    const now = new Date();
+
+    const updatedTicket = await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        status: dto.toStatus,
+        closedAt: dto.toStatus === 'CLOSED' ? now : null,
+        cancelledAt: dto.toStatus === 'CANCELLED' ? now : null,
+        events: {
+          create: {
+            type: 'STATUS_CHANGED',
+            visibility: 'PUBLIC',
+            actorId: currentUser.userId,
+            fromStatus: ticket.status,
+            toStatus: dto.toStatus,
+            message: dto.reason ?? `Estado cambiado de ${ticket.status} a ${dto.toStatus}`,
+          },
+        },
+      },
+      include: {
+        creator: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        assignedTo: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        _count: {
+          select: { events: true, attachments: true },
         },
       },
     });
