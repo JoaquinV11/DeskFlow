@@ -1,5 +1,4 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
-import { TicketPriority } from "@prisma/client";
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateTicketDto {
   @IsString()
@@ -11,8 +10,8 @@ export class CreateTicketDto {
   description!: string;
 
   @IsOptional()
-  @IsEnum(TicketPriority)
-  priority?: TicketPriority;
+  @IsIn(['LOW', 'MEDIUM', 'HIGH'])
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
 
   @IsOptional()
   @IsString()
