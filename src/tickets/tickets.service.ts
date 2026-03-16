@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -182,5 +183,76 @@ export class TicketsService {
     });
 
     return event;
+  }
+
+  async assign(
+    ticketId: string,
+    dto: { assigneeId: string },
+    currentUser: CurrentUser,
+  ) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        status: true,
+        assignedToId: true,
+        creatorId: true,
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+
+    if (ticket.status === 'CLOSED' || ticket.status === 'CANCELLED') {
+      throw new ForbiddenException('No se puede asignar un ticket en estado final');
+    }
+
+    if (ticket.assignedToId === dto.assigneeId) {
+      throw new BadRequestException('El ticket ya está asignado a ese usuario');
+    }
+
+    const assignee = await this.prisma.user.findUnique({
+      where: { id: dto.assigneeId },
+      select: { id: true, email: true, name: true, role: true },
+    });
+
+    if (!assignee) {
+      throw new NotFoundException('Usuario asignado no encontrado');
+    }
+
+    if (assignee.role === 'USER') {
+      throw new BadRequestException('Solo se puede asignar a AGENT o ADMIN');
+    }
+
+    const updatedTicket = await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        assignedToId: assignee.id,
+        events: {
+          create: {
+            type: 'ASSIGNED',
+            visibility: 'INTERNAL',
+            actorId: currentUser.userId,
+            fromAssigneeId: ticket.assignedToId,
+            toAssigneeId: assignee.id,
+            message: `Asignado a ${assignee.name} (${assignee.email})`,
+          },
+        },
+      },
+      include: {
+        creator: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        assignedTo: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        _count: {
+          select: { events: true },
+        },
+      },
+    });
+
+    return updatedTicket;
   }
 }

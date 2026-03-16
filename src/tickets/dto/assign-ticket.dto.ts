@@ -1,7 +1,7 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsString, MinLength } from 'class-validator';
 
 export class AssignTicketDto {
-  @IsOptional()
   @IsString()
-  assigneeId?: string; // null/undefined = desasignar (si lo permitís)
+  @MinLength(1)
+  assigneeId!: string;
 }

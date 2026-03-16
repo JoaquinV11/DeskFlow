@@ -5,6 +5,7 @@ import { CreateTicketMessageEventDto } from './dto/create-ticket-message-event.d
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AssignTicketDto } from './dto/assign-ticket.dto';
 
 @Controller('tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,6 +38,16 @@ export class TicketsController {
     @Req() req: any,
   ) {
     return this.ticketsService.createMessageEvent(id, dto, req.user);
+  }
+
+  @Post(':id/assign')
+  @Roles('AGENT', 'ADMIN')
+  assign(
+    @Param('id') id: string,
+    @Body() dto: AssignTicketDto,
+    @Req() req: any,
+  ) {
+    return this.ticketsService.assign(id, dto, req.user);
   }
 
   @Get(':id')
