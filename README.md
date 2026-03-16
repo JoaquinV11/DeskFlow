@@ -1,151 +1,172 @@
-# DeskFlow API
+# DeskFlow
 
-Backend de un sistema **HelpDesk B2B** (mesa de ayuda) orientado a roles, con **timeline/auditoría**, **workflow de tickets** y **métricas**.
+DeskFlow es un helpdesk B2B backend-first con API REST en NestJS + Prisma/PostgreSQL y un frontend de demo en Next.js para recorrer el flujo principal del producto (login, tickets, timeline, asignación, cambio de estado y métricas).
 
-Proyecto backend-first construido con **NestJS**, **Prisma** y **PostgreSQL**, enfocado en demostrar diseño de dominio, reglas de negocio y autorización por roles.
+El foco del proyecto está en el backend: autenticación, autorización por roles, reglas de negocio del workflow de tickets, timeline con visibilidad pública/interna y métricas operativas. El frontend existe como capa de demo para mostrar el flujo completo.
 
----
+## Stack
 
-## ✨ Qué resuelve DeskFlow
+### Backend
+- NestJS
+- Prisma ORM
+- PostgreSQL
+- JWT (autenticación)
+- Swagger / OpenAPI
+- Docker (DB local)
 
-DeskFlow simula un sistema de soporte interno/empresarial donde:
+### Frontend (demo)
+- Next.js (App Router)
+- React + TypeScript
+- Tailwind CSS
 
-- **Usuarios finales** crean tickets y comentan su problema
-- **Agentes de soporte** gestionan tickets, agregan notas internas y cambian estados
-- **Admins** tienen acceso total y visión global (incluyendo métricas)
+## Features
 
-El objetivo del proyecto es modelar una API **realista** de helpdesk, no solo un CRUD básico.
+### Backend
+- Auth con JWT (`api/auth/login`, `api/auth/me`)
+- Roles y permisos (`USER`, `AGENT`, `ADMIN`)
+- Creación de tickets (permitida para `USER` y `ADMIN`; `AGENT` no crea tickets)
+- Listado de tickets con filtros y paginación
+- Detalle de ticket
+- Timeline de eventos con visibilidad `PUBLIC` / `INTERNAL`
+- Comentarios en tickets (públicos e internos según rol)
+- Asignación / reasignación de tickets
+- Cambio de estado con transiciones válidas
+- Métricas operativas (`api/metrics/overview`)
+- Endpoint de usuarios asignables (`api/users/assignable`)
+- Swagger con autenticación Bearer
+- Seed demo realista
 
----
+### Frontend (demo)
+- Login con JWT
+- Header global en rutas protegidas
+- UI por rol (oculta acciones no permitidas)
+- Lista de tickets con filtros, búsqueda y paginación
+- Crear ticket desde frontend
+- Detalle de ticket con timeline
+- Agregar mensajes (públicos / internos según rol)
+- Asignar / reasignar ticket (incluye "Asignarme")
+- Cambiar estado desde frontend
+- Pantalla de métricas
+- Dark mode (según tema del sistema)
 
-## 🧱 Stack
+## Roles demo
 
-- **Node.js**
-- **NestJS**
-- **Prisma ORM (v7)**
-- **PostgreSQL**
-- **JWT** (autenticación)
-- **Passport** (estrategia JWT)
-- **Docker Compose** (DB local)
-- **Swagger / OpenAPI** (`/docs`)
+Usa estas credenciales para probar distintos flujos:
 
----
+- `admin@demo.com` / `demo123`
+- `agent@demo.com` / `demo123`
+- `user@demo.com` / `demo123`
 
-## ✅ Features implementadas
+### Permisos por rol (resumen)
 
-### Auth & Roles
-- Login con JWT (`/auth/login`)
-- Endpoint protegido `/auth/me`
-- Roles:
-  - `USER`
-  - `AGENT`
-  - `ADMIN`
-- Guards de autorización por rol
+#### USER
+- Puede iniciar sesión
+- Puede crear tickets
+- Puede ver solo sus tickets
+- Puede comentar en sus tickets (solo mensajes públicos)
+- No puede ver métricas
+- No puede asignar ni cambiar estado
+- No ve eventos internos
+
+#### AGENT
+- Puede iniciar sesión
+- Puede ver tickets
+- Puede comentar público / interno
+- Puede asignar / reasignar tickets
+- Puede cambiar estado
+- Puede ver métricas
+- No puede crear tickets
+
+#### ADMIN
+- Puede iniciar sesión
+- Puede crear tickets
+- Puede ver tickets
+- Puede comentar público / interno
+- Puede asignar / reasignar tickets
+- Puede cambiar estado
+- Puede ver métricas
+
+## Flujo demo recomendado
+
+### Flujo 1 (usuario final -> soporte)
+1. Iniciar sesión como `user@demo.com`
+2. Ir a **Nuevo ticket**
+3. Crear un ticket con prioridad media o alta
+4. Entrar al detalle del ticket
+5. Agregar un mensaje público
+
+### Flujo 2 (soporte / admin)
+1. Cerrar sesión e iniciar como `agent@demo.com` o `admin@demo.com`
+2. Abrir el ticket creado
+3. Asignarte o reasignarlo desde el dropdown
+4. Cambiar estado (`OPEN -> IN_PROGRESS -> WAITING_USER` o `CLOSED`)
+5. Agregar una nota interna
+6. Ver el timeline actualizado
+7. Ir a **Métricas** y revisar el resumen
+
+## Arquitectura y estructura del repo
+
+Actualmente el backend vive en la raíz del repo y el frontend de demo en `/web`.
+
+```text
+repo/
+  src/                 # Backend NestJS (módulos, controllers, services)
+  prisma/              # Schema, migrations y seed
+  generated/           # artefactos locales generados
+  web/                 # Frontend Next.js (App Router)
+    src/app/
+    src/components/
+    src/lib/
+  docker-compose.yml   # PostgreSQL local
+  package.json         # Backend
+```
+
+## API Docs (Swagger)
+
+Swagger local:
+
+- `http://localhost:3000/docs`
+
+Notas:
+- La API usa JWT Bearer en endpoints protegidos
+- Swagger está configurado para persistir autorización (`persistAuthorization`)
+
+## Endpoints principales
+
+### Auth
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+
+### Health / utilidades de prueba
+- `GET /api/health`
+- `GET /api/health/db`
+- `GET /api/auth/test/admin`
+- `GET /api/auth/test/support`
 
 ### Tickets
-- Crear ticket
-- Listar tickets (con permisos por rol)
-- Ver detalle de ticket
-- Asignar ticket a agente/admin
-- Cambiar estado con transiciones válidas
+- `POST /api/tickets` (creación de ticket; permitido para `USER` y `ADMIN`)
+- `GET /api/tickets`
+- `GET /api/tickets/:id`
+- `GET /api/tickets/:id/events`
+- `POST /api/tickets/:id/events/message`
+- `POST /api/tickets/:id/assign`
+- `POST /api/tickets/:id/status`
 
-### Timeline / Auditoría
-- Eventos por ticket (`CREATED`, `MESSAGE`, `ASSIGNED`, `STATUS_CHANGED`, etc.)
-- Mensajes públicos e internos (`PUBLIC` / `INTERNAL`)
-- Visibilidad filtrada por rol:
-  - `USER` solo ve eventos `PUBLIC`
-  - `AGENT` / `ADMIN` ven `PUBLIC` + `INTERNAL`
+### Users
+- `GET /api/users/assignable`
 
-### Reglas de negocio
-- Usuarios finales no pueden crear notas internas
-- Tickets en estado final (`CLOSED` / `CANCELLED`) no aceptan mensajes
-- Validación de transiciones de estado
-- Restricción de acceso por ownership (usuario final solo ve sus tickets)
+### Metrics
+- `GET /api/metrics/overview`
 
-### Métricas
-- Endpoint `GET /metrics/overview` (solo `AGENT` / `ADMIN`)
-- Totales por estado
-- Tickets sin asignar
-- Tickets creados/cerrados en los últimos 7 días
+## Requisitos
 
----
+- Node.js 20+
+- pnpm
+- Docker + Docker Compose
 
-## 👥 Roles y permisos (resumen)
+## Setup local
 
-### USER
-- ✅ Crear ticket
-- ✅ Ver sus propios tickets
-- ✅ Comentar en sus tickets (solo `PUBLIC`)
-- ❌ Asignar tickets
-- ❌ Cambiar estados
-- ❌ Ver notas internas
-
-### AGENT
-- ✅ Ver todos los tickets
-- ✅ Comentar (`PUBLIC` / `INTERNAL`)
-- ✅ Asignar tickets
-- ✅ Cambiar estados
-- ✅ Ver métricas
-
-### ADMIN
-- ✅ Todo lo de AGENT
-- ✅ Acceso total a tickets y métricas
-
----
-
-## 🔄 Workflow de estados
-
-Estados implementados:
-
-- `OPEN`
-- `IN_PROGRESS`
-- `WAITING_USER`
-- `CLOSED`
-- `CANCELLED`
-
-### Transiciones válidas
-- `OPEN -> IN_PROGRESS | CANCELLED`
-- `IN_PROGRESS -> WAITING_USER | CLOSED | CANCELLED`
-- `WAITING_USER -> IN_PROGRESS | CLOSED | CANCELLED`
-- `CLOSED ->` _(sin transición en esta versión)_
-- `CANCELLED ->` _(sin transición en esta versión)_
-
-> Además, para pasar a `IN_PROGRESS`, el ticket debe tener un responsable asignado.
-
----
-
-## 🕒 Timeline / Eventos
-
-Cada ticket mantiene un historial cronológico de eventos (`TicketEvent`), por ejemplo:
-
-- `CREATED`
-- `MESSAGE`
-- `ASSIGNED`
-- `STATUS_CHANGED`
-
-Esto permite auditar:
-- quién hizo una acción
-- cuándo la hizo
-- qué cambió (estado, asignación, etc.)
-- si el evento es visible al usuario final (`PUBLIC`) o interno (`INTERNAL`)
-
----
-
-## 📚 Documentación API (Swagger)
-
-Swagger UI disponible en:
-
-- **`/docs`** (por ejemplo `http://localhost:3000/docs`)
-
-La API usa prefijo global:
-
-- **`/api`** (por ejemplo `http://localhost:3000/api/tickets`)
-
----
-
-## 🚀 Cómo correr el proyecto localmente
-
-### 1) Clonar e instalar dependencias
+### 1) Clonar e instalar dependencias (backend)
 
 ```bash
 pnpm install
@@ -154,158 +175,174 @@ pnpm install
 ### 2) Levantar PostgreSQL con Docker
 
 ```bash
-docker compose up -d
+sudo docker compose up -d
 ```
 
-### 3) Configurar variables de entorno (`.env`)
-
-Crear archivo `.env` en la raíz del proyecto:
-
-```env
-DATABASE_URL="postgresql://deskflow:deskflow@localhost:5432/deskflow?schema=public"
-JWT_SECRET="super-secret-dev"
-```
-
-> Prisma v7 usa `prisma.config.ts` para leer la URL de conexión, que toma `DATABASE_URL` desde `.env`.
-
-### 4) Generar cliente Prisma
+Verificar logs (opcional):
 
 ```bash
-pnpm prisma generate
+sudo docker compose logs -f db
 ```
 
-### 5) Ejecutar migraciones
+### 3) Configurar variables de entorno (backend)
 
+Crear `.env` en la raíz del repo (backend) tomando como base `.env.example`.
+
+### 4) Ejecutar migraciones y cargar seed demo
+
+#### Opción normal (si ya tenés DB levantada)
 ```bash
 pnpm prisma migrate dev
-```
-
-### 6) Cargar datos de demo (seed)
-
-```bash
 pnpm seed
 ```
 
-### 7) Levantar la API
+#### Opción reset completo (recomendado para volver al estado demo exacto)
+```bash
+pnpm prisma migrate reset --force
+```
+
+### 5) Levantar backend
 
 ```bash
 pnpm start:dev
 ```
 
-La API debería quedar disponible en:
-
+API local:
 - `http://localhost:3000/api`
+
+Swagger local:
 - `http://localhost:3000/docs`
 
----
+## Setup frontend (Next.js demo)
 
-## 🔐 Credenciales demo
+### 1) Entrar al frontend
 
-El seed crea tres usuarios (password: **`demo123`**):
-
-- **admin@demo.com** → `ADMIN`
-- **agent@demo.com** → `AGENT`
-- **user@demo.com** → `USER`
-
----
-
-## 🔌 Endpoints principales
-
-### Health
-- `GET /api/health`
-- `GET /api/health/db`
-
-### Auth
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET /api/auth/test/admin`
-- `GET /api/auth/test/support`
-
-### Tickets
-- `POST /api/tickets`
-- `GET /api/tickets`
-- `GET /api/tickets/:id`
-- `GET /api/tickets/:id/events`
-- `POST /api/tickets/:id/events/message`
-- `POST /api/tickets/:id/assign`
-- `POST /api/tickets/:id/status`
-
-### Metrics
-- `GET /api/metrics/overview`
-
----
-
-## 🧪 Ejemplo de flujo (demo)
-
-1. Login como `user@demo.com`
-2. Crear ticket
-3. Comentar ticket (`PUBLIC`)
-4. Login como `agent@demo.com`
-5. Agregar nota interna (`INTERNAL`)
-6. Asignar ticket
-7. Cambiar estado `OPEN -> IN_PROGRESS -> WAITING_USER`
-8. Login como `admin@demo.com`
-9. Cerrar ticket
-10. Revisar `/api/metrics/overview`
-
----
-
-## 🗂️ Estructura del proyecto (resumen)
-
-```text
-src/
-  auth/
-  prisma/
-  tickets/
-  metrics/
-  app.controller.ts
-  app.module.ts
-  main.ts
-
-prisma/
-  schema.prisma
-  migrations/
-  seed.ts
+```bash
+cd web
 ```
 
----
+### 2) Instalar dependencias
 
-## 🧠 Decisiones de diseño (resumen)
+```bash
+pnpm install
+```
 
-- **Timeline basado en eventos** en lugar de “comentarios sueltos”
-  - facilita auditoría y extensibilidad
-- **Visibilidad de eventos (`PUBLIC` / `INTERNAL`)**
-  - separa comunicación con usuario final vs notas internas de soporte
-- **Roles + guards**
-  - control de acceso explícito por endpoint
-- **Reglas de transición de estados**
-  - modelado de negocio más realista que un CRUD de status libre
+### 3) Configurar variables de entorno (frontend)
 
----
+Crear `web/.env.local` tomando como base `web/.env.example`.
 
-## 📈 Próximas mejoras (roadmap)
+Ejemplo:
 
-- [ ] Paginación en tickets y eventos
-- [ ] Filtros y búsqueda (`status`, `priority`, `assignedTo`, `q`)
-- [ ] CRUD de categorías y tags
-- [ ] Attachments reales (upload + storage)
-- [ ] Más métricas (por agente, por prioridad, tendencias)
-- [ ] Tests e2e / integración
-- [ ] Frontend mínimo (dashboard/lista/detalle)
-- [ ] Deploy público (API + DB)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+```
 
----
+### 4) Levantar frontend
 
-## 📌 Estado del proyecto
+```bash
+pnpm dev --port 3001
+```
 
-Proyecto en desarrollo activo como portfolio backend-focused, con foco en:
-- diseño de API
-- reglas de negocio
-- autorización
-- mantenibilidad
+Frontend local:
+- `http://localhost:3001`
 
----
+## Variables de entorno
 
-## 👨‍💻 Autor
+### Backend (`.env`)
 
-Desarrollado por **Joaquín** como proyecto de portfolio para roles **Backend / Full Stack (backend-oriented)**.
+Ver `.env.example`. Variables esperadas:
+
+- `DATABASE_URL` - conexión a PostgreSQL
+- `JWT_SECRET` - clave para firmar JWT
+- `PORT` - puerto del backend (por defecto 3000)
+
+### Frontend (`web/.env.local`)
+
+Ver `web/.env.example`. Variables esperadas:
+
+- `NEXT_PUBLIC_API_URL` - URL base de la API (incluye `/api`)
+
+## Docker / Base de datos local
+
+El proyecto usa PostgreSQL local vía `docker-compose.yml`.
+
+Comandos útiles:
+
+```bash
+# Levantar DB
+sudo docker compose up -d
+
+# Ver contenedores
+sudo docker ps
+
+# Ver logs
+sudo docker compose logs -f db
+
+# Apagar DB
+sudo docker compose down
+
+# Apagar y borrar volumen (borra datos)
+sudo docker compose down -v
+```
+
+## Capturas (screenshots)
+
+Agregar capturas en `docs/images/` para mejorar la presentación del repo.
+
+Podría hacer algo como:
+
+```text
+docs/images/
+  login.png
+  tickets-list.png
+  ticket-detail.png
+  metrics.png
+```
+
+Y referenciarlas acá:
+
+### Login
+![Login](docs/images/login.png)
+
+### Lista de tickets
+![Lista de tickets](docs/images/tickets-list.png)
+
+### Detalle de ticket (timeline + acciones)
+![Detalle de ticket](docs/images/ticket-detail.png)
+
+### Métricas
+![Métricas](docs/images/metrics.png)
+
+## Decisión de diseño (resumen)
+
+- **Backend-first**: se priorizó modelado de dominio, permisos, reglas de negocio y API documentada.
+- **Timeline con visibilidad**: los eventos pueden ser `PUBLIC` o `INTERNAL` para separar comunicación con usuario final vs notas internas de soporte.
+- **UI por rol**: el frontend oculta acciones no permitidas, mientras el backend mantiene la seguridad real con guards.
+- **Frontend de demo deliberadamente simple**: suficiente para demostrar el flujo principal sin desviar el foco del backend.
+
+## Estado del proyecto
+
+DeskFlow está en una etapa funcional y demostrable como proyecto de portafolio.
+
+Incluye:
+- API backend con reglas de negocio y documentación Swagger
+- Frontend de demo para recorrer el flujo principal de tickets
+- Seed demo para pruebas rápidas
+
+## Próximos pasos (roadmap corto)
+
+- Deploy backend + DB (Railway / Render)
+- Deploy frontend (Vercel)
+- README final con links públicos
+- Tests backend mínimos (reglas de negocio críticas)
+- Pulido extra de UI (opcional)
+
+## Links (completar después del deploy)
+
+- Demo frontend: `PENDIENTE`
+- Swagger online: `PENDIENTE`
+- API base URL: `PENDIENTE`
+
+## Licencia
+
+Este proyecto está bajo la licencia MIT. Ver el archivo [LICENSE](./LICENSE).
