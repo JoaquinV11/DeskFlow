@@ -94,4 +94,93 @@ export class TicketsService {
 
     return ticket;
   }
+
+
+  async findEvents(ticketId: string, currentUser: CurrentUser) {
+    // Se reutiliza la lógica de permisos: si puede ver el ticket, puede ver sus eventos
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { id: true, creatorId: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+
+    if (currentUser.role === 'USER' && ticket.creatorId !== currentUser.userId) {
+      throw new ForbiddenException('No tenés permisos para ver este ticket');
+    }
+
+    const where =
+      currentUser.role === 'USER'
+        ? { ticketId, visibility: 'PUBLIC' as const }
+        : { ticketId };
+
+    return this.prisma.ticketEvent.findMany({
+      where,
+      orderBy: { createdAt: 'asc' },
+      include: {
+        actor: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        tag: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+  }
+
+  async createMessageEvent(
+    ticketId: string,
+    dto: { message: string; visibility: 'PUBLIC' | 'INTERNAL' },
+    currentUser: CurrentUser,
+  ) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        creatorId: true,
+        status: true,
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+
+    // USER solo puede operar sobre sus tickets
+    if (currentUser.role === 'USER' && ticket.creatorId !== currentUser.userId) {
+      throw new ForbiddenException('No tenés permisos para comentar en este ticket');
+    }
+
+    // USER no puede crear notas internas
+    if (currentUser.role === 'USER' && dto.visibility === 'INTERNAL') {
+      throw new ForbiddenException('Un usuario final no puede crear notas internas');
+    }
+
+    // Tickets cerrados/cancelados no aceptan mensajes
+    if (ticket.status === 'CLOSED' || ticket.status === 'CANCELLED') {
+      throw new ForbiddenException('El ticket no acepta mensajes en su estado actual');
+    }
+
+    const event = await this.prisma.ticketEvent.create({
+      data: {
+        ticketId: ticket.id,
+        actorId: currentUser.userId,
+        type: 'MESSAGE',
+        visibility: dto.visibility,
+        message: dto.message,
+      },
+      include: {
+        actor: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        tag: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    return event;
+  }
 }
