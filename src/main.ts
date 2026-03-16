@@ -29,12 +29,21 @@ async function bootstrap() {
   .setTitle('DeskFlow API')
   .setDescription('HelpDesk B2B backend-first con NestJS, Prisma y PostgreSQL')
   .setVersion('1.0.0')
-  .addBearerAuth()
+  .addBearerAuth(
+    {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'Pegá el accessToken (sin "Bearer ")',
+    },
+    'access-token',
+  )
   .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, swaggerDocument, {
     swaggerOptions: {
+      customSiteTitle: 'DeskFlow API Docs',
       persistAuthorization: true,
     },
     useGlobalPrefix: true, //acceder por /api/docs
