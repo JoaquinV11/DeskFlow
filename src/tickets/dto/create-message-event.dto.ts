@@ -1,5 +1,5 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
-import { EventVisibility } from "@prisma/client";
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { EventVisibility } from '@prisma/client';
 
 export class CreateMessageEventDto {
   @IsEnum(EventVisibility)

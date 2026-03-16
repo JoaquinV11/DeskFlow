@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { CreateTicketMessageEventDto } from './dto/create-ticket-message-event.dto';
@@ -10,7 +18,12 @@ import { ChangeTicketStatusDto } from './dto/change-ticket-status.dto';
 import { Query } from '@nestjs/common';
 import { ListTicketsQueryDto } from './dto/list-tickets-query.dto';
 import { ListTicketEventsQueryDto } from './dto/list-ticket-events-query.dto';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 @ApiTags('Tickets')
 @ApiBearerAuth('access-token')
@@ -59,7 +72,10 @@ export class TicketsController {
   @Roles('AGENT', 'ADMIN')
   @ApiOperation({ summary: 'Asignar o reasignar ticket' })
   @ApiResponse({ status: 201, description: 'Ticket asignado correctamente' })
-  @ApiResponse({ status: 400, description: 'Solicitud inválida (por ejemplo, usuario no asignable)' })
+  @ApiResponse({
+    status: 400,
+    description: 'Solicitud inválida (por ejemplo, usuario no asignable)',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Ticket o usuario no encontrado' })
@@ -74,8 +90,14 @@ export class TicketsController {
   @Post(':id/status')
   @Roles('AGENT', 'ADMIN')
   @ApiOperation({ summary: 'Cambiar estado del ticket' })
-  @ApiResponse({ status: 201, description: 'Estado del ticket actualizado correctamente' })
-  @ApiResponse({ status: 400, description: 'Transición inválida o payload inválido' })
+  @ApiResponse({
+    status: 201,
+    description: 'Estado del ticket actualizado correctamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Transición inválida o payload inválido',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Ticket no encontrado' })
@@ -90,9 +112,15 @@ export class TicketsController {
   @Get(':id')
   @Roles('USER', 'AGENT', 'ADMIN')
   @ApiOperation({ summary: 'Obtener detalle de ticket' })
-  @ApiResponse({ status: 200, description: 'Detalle de ticket obtenido correctamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalle de ticket obtenido correctamente',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'Sin permisos para ver este ticket' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin permisos para ver este ticket',
+  })
   @ApiResponse({ status: 404, description: 'Ticket no encontrado' })
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.ticketsService.findOne(id, req.user);

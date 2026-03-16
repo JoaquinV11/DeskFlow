@@ -105,9 +105,7 @@ export class TicketsService {
           },
           _count: {
             select: {
-              events: isEndUser
-                ? { where: { visibility: 'PUBLIC' } }
-                : true,
+              events: isEndUser ? { where: { visibility: 'PUBLIC' } } : true,
             },
           },
         },
@@ -145,9 +143,7 @@ export class TicketsService {
         _count: {
           select: {
             attachments: true,
-            events: isEndUser
-              ? { where: { visibility: 'PUBLIC' } }
-              : true,
+            events: isEndUser ? { where: { visibility: 'PUBLIC' } } : true,
           },
         },
       },
@@ -158,13 +154,15 @@ export class TicketsService {
     }
 
     // USER solo puede ver sus tickets
-    if (currentUser.role === 'USER' && ticket.creatorId !== currentUser.userId) {
+    if (
+      currentUser.role === 'USER' &&
+      ticket.creatorId !== currentUser.userId
+    ) {
       throw new ForbiddenException('No tenés permisos para ver este ticket');
     }
 
     return ticket;
   }
-
 
   async findEvents(
     ticketId: string,
@@ -180,7 +178,10 @@ export class TicketsService {
       throw new NotFoundException('Ticket no encontrado');
     }
 
-    if (currentUser.role === 'USER' && ticket.creatorId !== currentUser.userId) {
+    if (
+      currentUser.role === 'USER' &&
+      ticket.creatorId !== currentUser.userId
+    ) {
       throw new ForbiddenException('No tenés permisos para ver este ticket');
     }
 
@@ -241,18 +242,27 @@ export class TicketsService {
     }
 
     // USER solo puede operar sobre sus tickets
-    if (currentUser.role === 'USER' && ticket.creatorId !== currentUser.userId) {
-      throw new ForbiddenException('No tenés permisos para comentar en este ticket');
+    if (
+      currentUser.role === 'USER' &&
+      ticket.creatorId !== currentUser.userId
+    ) {
+      throw new ForbiddenException(
+        'No tenés permisos para comentar en este ticket',
+      );
     }
 
     // USER no puede crear notas internas
     if (currentUser.role === 'USER' && dto.visibility === 'INTERNAL') {
-      throw new ForbiddenException('Un usuario final no puede crear notas internas');
+      throw new ForbiddenException(
+        'Un usuario final no puede crear notas internas',
+      );
     }
 
     // Tickets cerrados/cancelados no aceptan mensajes
     if (ticket.status === 'CLOSED' || ticket.status === 'CANCELLED') {
-      throw new ForbiddenException('El ticket no acepta mensajes en su estado actual');
+      throw new ForbiddenException(
+        'El ticket no acepta mensajes en su estado actual',
+      );
     }
 
     const event = await this.prisma.ticketEvent.create({
@@ -296,7 +306,9 @@ export class TicketsService {
     }
 
     if (ticket.status === 'CLOSED' || ticket.status === 'CANCELLED') {
-      throw new ForbiddenException('No se puede asignar un ticket en estado final');
+      throw new ForbiddenException(
+        'No se puede asignar un ticket en estado final',
+      );
     }
 
     if (ticket.assignedToId === dto.assigneeId) {
@@ -349,7 +361,15 @@ export class TicketsService {
 
   async changeStatus(
     ticketId: string,
-    dto: { toStatus: 'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'CLOSED' | 'CANCELLED'; reason?: string },
+    dto: {
+      toStatus:
+        | 'OPEN'
+        | 'IN_PROGRESS'
+        | 'WAITING_USER'
+        | 'CLOSED'
+        | 'CANCELLED';
+      reason?: string;
+    },
     currentUser: CurrentUser,
   ) {
     const ticket = await this.prisma.ticket.findUnique({
@@ -372,7 +392,10 @@ export class TicketsService {
       throw new BadRequestException('El ticket ya está en ese estado');
     }
 
-    const allowed = ALLOWED_STATUS_TRANSITIONS[ticket.status as keyof typeof ALLOWED_STATUS_TRANSITIONS] ?? [];
+    const allowed =
+      ALLOWED_STATUS_TRANSITIONS[
+        ticket.status as keyof typeof ALLOWED_STATUS_TRANSITIONS
+      ] ?? [];
     if (!allowed.includes(dto.toStatus)) {
       throw new BadRequestException(
         `Transición inválida: ${ticket.status} -> ${dto.toStatus}`,
@@ -381,7 +404,9 @@ export class TicketsService {
 
     // (Opcional, pero útil): para pasar a IN_PROGRESS pedimos asignación
     if (dto.toStatus === 'IN_PROGRESS' && !ticket.assignedToId) {
-      throw new BadRequestException('No se puede pasar a IN_PROGRESS sin un responsable asignado');
+      throw new BadRequestException(
+        'No se puede pasar a IN_PROGRESS sin un responsable asignado',
+      );
     }
 
     const now = new Date();
@@ -399,7 +424,9 @@ export class TicketsService {
             actorId: currentUser.userId,
             fromStatus: ticket.status,
             toStatus: dto.toStatus,
-            message: dto.reason ?? `Estado cambiado de ${ticket.status} a ${dto.toStatus}`,
+            message:
+              dto.reason ??
+              `Estado cambiado de ${ticket.status} a ${dto.toStatus}`,
           },
         },
       },

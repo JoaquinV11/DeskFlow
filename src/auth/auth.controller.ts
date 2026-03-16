@@ -20,7 +20,10 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Obtener usuario autenticado actual' })
-  @ApiResponse({ status: 200, description: 'Usuario autenticado obtenido correctamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usuario autenticado obtenido correctamente',
+  })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   me(@Req() req: any) {
     return req.user;
