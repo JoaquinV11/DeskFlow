@@ -55,24 +55,77 @@ export class TicketsService {
     return ticket;
   }
 
-  async findAll(currentUser: CurrentUser) {
-    const where = currentUser.role === 'USER' ? { creatorId: currentUser.userId } : {};
+  async findAll(
+    currentUser: CurrentUser,
+    query: {
+      status?: 'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'CLOSED' | 'CANCELLED';
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+      assignedToId?: string;
+      q?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const skip = (page - 1) * limit;
 
-    return this.prisma.ticket.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        creator: {
-          select: { id: true, email: true, name: true, role: true },
+    const where: any = {};
+
+    // USER solo ve sus tickets
+    if (currentUser.role === 'USER') {
+      where.creatorId = currentUser.userId;
+    }
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.priority) {
+      where.priority = query.priority;
+    }
+
+    if (query.assignedToId) {
+      where.assignedToId = query.assignedToId;
+    }
+
+    if (query.q && query.q.trim()) {
+      where.OR = [
+        { title: { contains: query.q.trim(), mode: 'insensitive' } },
+        { description: { contains: query.q.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          creator: {
+            select: { id: true, email: true, name: true, role: true },
+          },
+          assignedTo: {
+            select: { id: true, email: true, name: true, role: true },
+          },
+          _count: {
+            select: { events: true },
+          },
         },
-        assignedTo: {
-          select: { id: true, email: true, name: true, role: true },
-        },
-        _count: {
-          select: { events: true },
-        },
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-    });
+    };
   }
 
   async findOne(ticketId: string, currentUser: CurrentUser) {
@@ -108,8 +161,11 @@ export class TicketsService {
   }
 
 
-  async findEvents(ticketId: string, currentUser: CurrentUser) {
-    // Se reutiliza la lógica de permisos: si puede ver el ticket, puede ver sus eventos
+  async findEvents(
+    ticketId: string,
+    currentUser: CurrentUser,
+    query?: { page?: number; limit?: number },
+  ) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
       select: { id: true, creatorId: true },
@@ -123,23 +179,42 @@ export class TicketsService {
       throw new ForbiddenException('No tenés permisos para ver este ticket');
     }
 
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
     const where =
       currentUser.role === 'USER'
         ? { ticketId, visibility: 'PUBLIC' as const }
         : { ticketId };
 
-    return this.prisma.ticketEvent.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      include: {
-        actor: {
-          select: { id: true, email: true, name: true, role: true },
+    const [items, total] = await Promise.all([
+      this.prisma.ticketEvent.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'asc' },
+        include: {
+          actor: {
+            select: { id: true, email: true, name: true, role: true },
+          },
+          tag: {
+            select: { id: true, name: true },
+          },
         },
-        tag: {
-          select: { id: true, name: true },
-        },
+      }),
+      this.prisma.ticketEvent.count({ where }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-    });
+    };
   }
 
   async createMessageEvent(

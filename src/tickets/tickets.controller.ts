@@ -7,6 +7,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { ChangeTicketStatusDto } from './dto/change-ticket-status.dto';
+import { Query } from '@nestjs/common';
+import { ListTicketsQueryDto } from './dto/list-tickets-query.dto';
+import { ListTicketEventsQueryDto } from './dto/list-ticket-events-query.dto';
 
 @Controller('tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -21,14 +24,18 @@ export class TicketsController {
 
   @Get()
   @Roles('USER', 'AGENT', 'ADMIN')
-  findAll(@Req() req: any) {
-    return this.ticketsService.findAll(req.user);
+  findAll(@Req() req: any, @Query() query: ListTicketsQueryDto) {
+    return this.ticketsService.findAll(req.user, query);
   }
 
   @Get(':id/events')
   @Roles('USER', 'AGENT', 'ADMIN')
-  findEvents(@Param('id') id: string, @Req() req: any) {
-    return this.ticketsService.findEvents(id, req.user);
+  findEvents(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Query() query: ListTicketEventsQueryDto,
+  ) {
+    return this.ticketsService.findEvents(id, req.user, query);
   }
 
   @Post(':id/events/message')
