@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { clearToken, getToken } from '@/lib/auth';
+import { clearToken, getToken, type CurrentUser } from '@/lib/auth';
 import type { PaginatedTickets } from '@/lib/types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -31,6 +31,8 @@ export default function TicketsPage() {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
 
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     params.set('page', String(page));
@@ -51,8 +53,14 @@ export default function TicketsPage() {
         return;
       }
 
-      const result = await apiFetch<PaginatedTickets>(`/tickets?${queryString}`);
-      setData(result);
+      const [meResult, ticketsResult] = await Promise.all([
+        apiFetch<CurrentUser>('/auth/me'),
+        apiFetch<PaginatedTickets>(`/tickets?${queryString}`),
+      ]);
+
+      setCurrentUser(meResult);
+      setData(ticketsResult);
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error cargando tickets';
 
@@ -91,12 +99,23 @@ export default function TicketsPage() {
               Listado de tickets (DeskFlow)
             </p>
           </div>
-          <button
-            onClick={onLogout}
-            className="self-start rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex gap-2 self-start">
+            {currentUser && currentUser.role !== 'USER' && (
+              <button
+                onClick={() => router.push('/metrics')}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Métricas
+              </button>
+            )}
+
+            <button
+              onClick={onLogout}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
