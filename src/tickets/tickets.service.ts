@@ -77,17 +77,9 @@ export class TicketsService {
       where.creatorId = currentUser.userId;
     }
 
-    if (query.status) {
-      where.status = query.status;
-    }
-
-    if (query.priority) {
-      where.priority = query.priority;
-    }
-
-    if (query.assignedToId) {
-      where.assignedToId = query.assignedToId;
-    }
+    if (query.status) where.status = query.status;
+    if (query.priority) where.priority = query.priority;
+    if (query.assignedToId) where.assignedToId = query.assignedToId;
 
     if (query.q && query.q.trim()) {
       where.OR = [
@@ -95,6 +87,8 @@ export class TicketsService {
         { description: { contains: query.q.trim(), mode: 'insensitive' } },
       ];
     }
+
+    const isEndUser = currentUser.role === 'USER';
 
     const [items, total] = await Promise.all([
       this.prisma.ticket.findMany({
@@ -110,7 +104,11 @@ export class TicketsService {
             select: { id: true, email: true, name: true, role: true },
           },
           _count: {
-            select: { events: true },
+            select: {
+              events: isEndUser
+                ? { where: { visibility: 'PUBLIC' } }
+                : true,
+            },
           },
         },
       }),
@@ -129,6 +127,8 @@ export class TicketsService {
   }
 
   async findOne(ticketId: string, currentUser: CurrentUser) {
+    const isEndUser = currentUser.role === 'USER';
+
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {
@@ -143,7 +143,12 @@ export class TicketsService {
           include: { tag: true },
         },
         _count: {
-          select: { events: true, attachments: true },
+          select: {
+            attachments: true,
+            events: isEndUser
+              ? { where: { visibility: 'PUBLIC' } }
+              : true,
+          },
         },
       },
     });
