@@ -4,6 +4,7 @@ ignoredBuiltDependencies:
 onlyBuiltDependencies:
   - '@nestjs/core'
   - '@prisma/engines'
+  - '@scarf/scarf'
   - bcrypt
   - esbuild
   - prisma
