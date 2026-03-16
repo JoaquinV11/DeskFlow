@@ -46,6 +46,13 @@ type PaginatedTicketEvents = {
   meta: { page: number; limit: number; total: number; totalPages: number };
 };
 
+type AssignableUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'AGENT' | 'ADMIN';
+};
+
 const STATUS_LABELS: Record<string, string> = {
   OPEN: 'Abierto',
   IN_PROGRESS: 'En progreso',
@@ -90,6 +97,13 @@ export default function TicketDetailPage() {
   const [changingStatus, setChangingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
+  const [assigningToMe, setAssigningToMe] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
+  const [assigningSelected, setAssigningSelected] = useState(false);
+
   const allowedNextStatuses = useMemo(() => {
     if (!ticket) return [];
     return ALLOWED_STATUS_TRANSITIONS[ticket.status] ?? [];
@@ -120,21 +134,40 @@ export default function TicketDetailPage() {
         return;
       }
 
-      const [meResult, ticketResult, eventsResult] = await Promise.all([
-        apiFetch<CurrentUser>('/auth/me'),
+      const meResult = await apiFetch<CurrentUser>('/auth/me');
+
+      const requests: Promise<any>[] = [
         apiFetch<TicketDetail>(`/tickets/${ticketId}`),
         apiFetch<PaginatedTicketEvents>(`/tickets/${ticketId}/events?page=1&limit=50`),
-      ]);
+      ];
+
+      if (meResult.role !== 'USER') {
+        requests.push(apiFetch<AssignableUser[]>('/users/assignable'));
+      }
+
+      const results = await Promise.all(requests);
+
+      const ticketResult = results[0] as TicketDetail;
+      const eventsResult = results[1] as PaginatedTicketEvents;
+      const assignablesResult =
+        meResult.role !== 'USER' ? (results[2] as AssignableUser[]) : [];
 
       setCurrentUser(meResult);
       setTicket(ticketResult);
       setEvents(eventsResult);
+      setAssignableUsers(assignablesResult);
 
-      // Si es USER, por UI lo dejo fijo en PUBLIC
+      // Si es USER, por UI lo dejamos fijo en PUBLIC
       if (meResult.role === 'USER') {
         setMessageVisibility('PUBLIC');
       }
 
+      // Preseleccionar asignado actual (si existe)
+      if (ticketResult.assignedTo?.id) {
+        setSelectedAssigneeId(ticketResult.assignedTo.id);
+      } else if (assignablesResult.length > 0) {
+        setSelectedAssigneeId(assignablesResult[0].id);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error cargando ticket';
 
@@ -218,6 +251,71 @@ export default function TicketDetailPage() {
       setStatusError(message);
     } finally {
       setChangingStatus(false);
+    }
+  }
+
+  async function onAssignToMe() {
+    if (!ticket || !currentUser) return;
+    if (currentUser.role === 'USER') return;
+
+    setAssigningToMe(true);
+    setAssignError(null);
+
+    try {
+      await apiFetch(`/tickets/${ticket.id}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({
+          assigneeId: currentUser.userId,
+        }),
+      });
+
+      await loadData(); // recarga detalle + timeline
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'No se pudo asignar el ticket';
+
+      if (message.toLowerCase().includes('unauthorized')) {
+        clearToken();
+        router.push('/login');
+        return;
+      }
+
+      setAssignError(message);
+    } finally {
+      setAssigningToMe(false);
+    }
+  }
+
+  async function onAssignSelected() {
+    if (!ticket || !currentUser) return;
+    if (currentUser.role === 'USER') return;
+    if (!selectedAssigneeId) return;
+
+    setAssigningSelected(true);
+    setAssignError(null);
+
+    try {
+      await apiFetch(`/tickets/${ticket.id}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({
+          assigneeId: selectedAssigneeId,
+        }),
+      });
+
+      await loadData(); // recarga detalle + timeline
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'No se pudo asignar el ticket';
+
+      if (message.toLowerCase().includes('unauthorized')) {
+        clearToken();
+        router.push('/login');
+        return;
+      }
+
+      setAssignError(message);
+    } finally {
+      setAssigningSelected(false);
     }
   }
 
@@ -328,6 +426,110 @@ export default function TicketDetailPage() {
             </div>
           </div>
         </section>
+
+        {currentUser && currentUser.role !== 'USER' && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100">
+                Asignación
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-zinc-400">
+                Podés asignarte este ticket o reasignarlo a otro miembro del equipo.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={onAssignToMe}
+                  disabled={
+                    assigningToMe ||
+                    ticket.status === 'CLOSED' ||
+                    ticket.status === 'CANCELLED' ||
+                    ticket.assignedTo?.id === currentUser.userId
+                  }
+                  className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  {assigningToMe
+                    ? 'Asignando...'
+                    : ticket.assignedTo?.id === currentUser.userId
+                    ? 'Ya está asignado a mí'
+                    : 'Asignarme'}
+                </button>
+
+                <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                  <select
+                    value={selectedAssigneeId}
+                    onChange={(e) => setSelectedAssigneeId(e.target.value)}
+                    disabled={
+                      assigningSelected ||
+                      ticket.status === 'CLOSED' ||
+                      ticket.status === 'CANCELLED' ||
+                      assignableUsers.length === 0
+                    }
+                    className="min-w-[260px] rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring focus:ring-gray-200 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:ring-zinc-700"
+                  >
+                    {assignableUsers.length === 0 ? (
+                      <option value="">No hay usuarios asignables</option>
+                    ) : (
+                      assignableUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role}) · {u.email}
+                        </option>
+                      ))
+                    )}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={onAssignSelected}
+                    disabled={
+                      assigningSelected ||
+                      !selectedAssigneeId ||
+                      ticket.status === 'CLOSED' ||
+                      ticket.status === 'CANCELLED' ||
+                      ticket.assignedTo?.id === selectedAssigneeId
+                    }
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    {assigningSelected
+                      ? 'Asignando...'
+                      : ticket.assignedTo?.id === selectedAssigneeId
+                      ? 'Ya asignado'
+                      : 'Asignar'}
+                  </button>
+                </div>
+              </div>
+
+              {ticket.assignedTo ? (
+                <p className="text-sm text-gray-600 dark:text-zinc-400">
+                  Actualmente asignado a{' '}
+                  <span className="font-medium text-gray-900 dark:text-zinc-100">
+                    {ticket.assignedTo.name}
+                  </span>{' '}
+                  ({ticket.assignedTo.role}).
+                </p>
+              ) : (
+                <p className="text-sm text-gray-600 dark:text-zinc-400">
+                  Actualmente sin asignar.
+                </p>
+              )}
+
+              {(ticket.status === 'CLOSED' || ticket.status === 'CANCELLED') && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                  No se puede asignar un ticket en estado final.
+                </div>
+              )}
+
+              {assignError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                  {assignError}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {currentUser && currentUser.role !== 'USER' && (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

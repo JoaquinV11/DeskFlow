@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { MetricsModule } from './metrics/metrics.module';
     AuthModule,
     TicketsModule,
     MetricsModule,
+    UsersModule,
   ],
   controllers: [AppController],
 })
