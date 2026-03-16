@@ -18,6 +18,8 @@ async function bootstrap() {
     }),
   );
 
+  app.setGlobalPrefix('api');
+
   const swaggerConfig = new DocumentBuilder()
   .setTitle('DeskFlow API')
   .setDescription('HelpDesk B2B backend-first con NestJS, Prisma y PostgreSQL')
@@ -26,9 +28,12 @@ async function bootstrap() {
   .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, swaggerDocument);
-
-  app.setGlobalPrefix('api');
+  SwaggerModule.setup('docs', app, swaggerDocument, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+    useGlobalPrefix: true, //acceder por /api/docs
+  });
 
   await app.listen(process.env.PORT ?? 3000);
   console.log(`DeskFlow API running on http://localhost:${process.env.PORT ?? 3000}/api`);
