@@ -1,98 +1,311 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# DeskFlow API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend de un sistema **HelpDesk B2B** (mesa de ayuda) orientado a roles, con **timeline/auditoría**, **workflow de tickets** y **métricas**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Proyecto backend-first construido con **NestJS**, **Prisma** y **PostgreSQL**, enfocado en demostrar diseño de dominio, reglas de negocio y autorización por roles.
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## ✨ Qué resuelve DeskFlow
 
-## Project setup
+DeskFlow simula un sistema de soporte interno/empresarial donde:
+
+- **Usuarios finales** crean tickets y comentan su problema
+- **Agentes de soporte** gestionan tickets, agregan notas internas y cambian estados
+- **Admins** tienen acceso total y visión global (incluyendo métricas)
+
+El objetivo del proyecto es modelar una API **realista** de helpdesk, no solo un CRUD básico.
+
+---
+
+## 🧱 Stack
+
+- **Node.js**
+- **NestJS**
+- **Prisma ORM (v7)**
+- **PostgreSQL**
+- **JWT** (autenticación)
+- **Passport** (estrategia JWT)
+- **Docker Compose** (DB local)
+- **Swagger / OpenAPI** (`/docs`)
+
+---
+
+## ✅ Features implementadas
+
+### Auth & Roles
+- Login con JWT (`/auth/login`)
+- Endpoint protegido `/auth/me`
+- Roles:
+  - `USER`
+  - `AGENT`
+  - `ADMIN`
+- Guards de autorización por rol
+
+### Tickets
+- Crear ticket
+- Listar tickets (con permisos por rol)
+- Ver detalle de ticket
+- Asignar ticket a agente/admin
+- Cambiar estado con transiciones válidas
+
+### Timeline / Auditoría
+- Eventos por ticket (`CREATED`, `MESSAGE`, `ASSIGNED`, `STATUS_CHANGED`, etc.)
+- Mensajes públicos e internos (`PUBLIC` / `INTERNAL`)
+- Visibilidad filtrada por rol:
+  - `USER` solo ve eventos `PUBLIC`
+  - `AGENT` / `ADMIN` ven `PUBLIC` + `INTERNAL`
+
+### Reglas de negocio
+- Usuarios finales no pueden crear notas internas
+- Tickets en estado final (`CLOSED` / `CANCELLED`) no aceptan mensajes
+- Validación de transiciones de estado
+- Restricción de acceso por ownership (usuario final solo ve sus tickets)
+
+### Métricas
+- Endpoint `GET /metrics/overview` (solo `AGENT` / `ADMIN`)
+- Totales por estado
+- Tickets sin asignar
+- Tickets creados/cerrados en los últimos 7 días
+
+---
+
+## 👥 Roles y permisos (resumen)
+
+### USER
+- ✅ Crear ticket
+- ✅ Ver sus propios tickets
+- ✅ Comentar en sus tickets (solo `PUBLIC`)
+- ❌ Asignar tickets
+- ❌ Cambiar estados
+- ❌ Ver notas internas
+
+### AGENT
+- ✅ Ver todos los tickets
+- ✅ Comentar (`PUBLIC` / `INTERNAL`)
+- ✅ Asignar tickets
+- ✅ Cambiar estados
+- ✅ Ver métricas
+
+### ADMIN
+- ✅ Todo lo de AGENT
+- ✅ Acceso total a tickets y métricas
+
+---
+
+## 🔄 Workflow de estados
+
+Estados implementados:
+
+- `OPEN`
+- `IN_PROGRESS`
+- `WAITING_USER`
+- `CLOSED`
+- `CANCELLED`
+
+### Transiciones válidas
+- `OPEN -> IN_PROGRESS | CANCELLED`
+- `IN_PROGRESS -> WAITING_USER | CLOSED | CANCELLED`
+- `WAITING_USER -> IN_PROGRESS | CLOSED | CANCELLED`
+- `CLOSED ->` _(sin transición en esta versión)_
+- `CANCELLED ->` _(sin transición en esta versión)_
+
+> Además, para pasar a `IN_PROGRESS`, el ticket debe tener un responsable asignado.
+
+---
+
+## 🕒 Timeline / Eventos
+
+Cada ticket mantiene un historial cronológico de eventos (`TicketEvent`), por ejemplo:
+
+- `CREATED`
+- `MESSAGE`
+- `ASSIGNED`
+- `STATUS_CHANGED`
+
+Esto permite auditar:
+- quién hizo una acción
+- cuándo la hizo
+- qué cambió (estado, asignación, etc.)
+- si el evento es visible al usuario final (`PUBLIC`) o interno (`INTERNAL`)
+
+---
+
+## 📚 Documentación API (Swagger)
+
+Swagger UI disponible en:
+
+- **`/docs`** (por ejemplo `http://localhost:3000/docs`)
+
+La API usa prefijo global:
+
+- **`/api`** (por ejemplo `http://localhost:3000/api/tickets`)
+
+---
+
+## 🚀 Cómo correr el proyecto localmente
+
+### 1) Clonar e instalar dependencias
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+### 2) Levantar PostgreSQL con Docker
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+docker compose up -d
 ```
 
-## Run tests
+### 3) Configurar variables de entorno (`.env`)
+
+Crear archivo `.env` en la raíz del proyecto:
+
+```env
+DATABASE_URL="postgresql://deskflow:deskflow@localhost:5432/deskflow?schema=public"
+JWT_SECRET="super-secret-dev"
+```
+
+> Prisma v7 usa `prisma.config.ts` para leer la URL de conexión, que toma `DATABASE_URL` desde `.env`.
+
+### 4) Generar cliente Prisma
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm prisma generate
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 5) Ejecutar migraciones
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm prisma migrate dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 6) Cargar datos de demo (seed)
 
-## Resources
+```bash
+pnpm seed
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### 7) Levantar la API
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+pnpm start:dev
+```
 
-## Support
+La API debería quedar disponible en:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- `http://localhost:3000/api`
+- `http://localhost:3000/docs`
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## 🔐 Credenciales demo
 
-## License
+El seed crea tres usuarios (password: **`demo123`**):
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **admin@demo.com** → `ADMIN`
+- **agent@demo.com** → `AGENT`
+- **user@demo.com** → `USER`
+
+---
+
+## 🔌 Endpoints principales
+
+### Health
+- `GET /api/health`
+- `GET /api/health/db`
+
+### Auth
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `GET /api/auth/test/admin`
+- `GET /api/auth/test/support`
+
+### Tickets
+- `POST /api/tickets`
+- `GET /api/tickets`
+- `GET /api/tickets/:id`
+- `GET /api/tickets/:id/events`
+- `POST /api/tickets/:id/events/message`
+- `POST /api/tickets/:id/assign`
+- `POST /api/tickets/:id/status`
+
+### Metrics
+- `GET /api/metrics/overview`
+
+---
+
+## 🧪 Ejemplo de flujo (demo)
+
+1. Login como `user@demo.com`
+2. Crear ticket
+3. Comentar ticket (`PUBLIC`)
+4. Login como `agent@demo.com`
+5. Agregar nota interna (`INTERNAL`)
+6. Asignar ticket
+7. Cambiar estado `OPEN -> IN_PROGRESS -> WAITING_USER`
+8. Login como `admin@demo.com`
+9. Cerrar ticket
+10. Revisar `/api/metrics/overview`
+
+---
+
+## 🗂️ Estructura del proyecto (resumen)
+
+```text
+src/
+  auth/
+  prisma/
+  tickets/
+  metrics/
+  app.controller.ts
+  app.module.ts
+  main.ts
+
+prisma/
+  schema.prisma
+  migrations/
+  seed.ts
+```
+
+---
+
+## 🧠 Decisiones de diseño (resumen)
+
+- **Timeline basado en eventos** en lugar de “comentarios sueltos”
+  - facilita auditoría y extensibilidad
+- **Visibilidad de eventos (`PUBLIC` / `INTERNAL`)**
+  - separa comunicación con usuario final vs notas internas de soporte
+- **Roles + guards**
+  - control de acceso explícito por endpoint
+- **Reglas de transición de estados**
+  - modelado de negocio más realista que un CRUD de status libre
+
+---
+
+## 📈 Próximas mejoras (roadmap)
+
+- [ ] Paginación en tickets y eventos
+- [ ] Filtros y búsqueda (`status`, `priority`, `assignedTo`, `q`)
+- [ ] CRUD de categorías y tags
+- [ ] Attachments reales (upload + storage)
+- [ ] Más métricas (por agente, por prioridad, tendencias)
+- [ ] Tests e2e / integración
+- [ ] Frontend mínimo (dashboard/lista/detalle)
+- [ ] Deploy público (API + DB)
+
+---
+
+## 📌 Estado del proyecto
+
+Proyecto en desarrollo activo como portfolio backend-focused, con foco en:
+- diseño de API
+- reglas de negocio
+- autorización
+- mantenibilidad
+
+---
+
+## 👨‍💻 Autor
+
+Desarrollado por **Joaquín** como proyecto de portfolio para roles **Backend / Full Stack (backend-oriented)**.
