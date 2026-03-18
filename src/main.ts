@@ -10,6 +10,11 @@ async function bootstrap() {
   const prismaService = app.get(PrismaService);
   await prismaService.enableShutdownHooks(app);
 
+  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3001')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -19,7 +24,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: ['http://localhost:3001'],
+    origin: corsOrigins,
     credentials: false,
   });
 
