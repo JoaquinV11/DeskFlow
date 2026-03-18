@@ -7,6 +7,7 @@ El foco del proyecto está en el backend: autenticación, autorización por role
 ## Stack
 
 ### Backend
+
 - NestJS
 - Prisma ORM
 - PostgreSQL
@@ -15,6 +16,7 @@ El foco del proyecto está en el backend: autenticación, autorización por role
 - Docker (DB local)
 
 ### Frontend (demo)
+
 - Next.js (App Router)
 - React + TypeScript
 - Tailwind CSS
@@ -22,6 +24,7 @@ El foco del proyecto está en el backend: autenticación, autorización por role
 ## Features
 
 ### Backend
+
 - Auth con JWT (`api/auth/login`, `api/auth/me`)
 - Roles y permisos (`USER`, `AGENT`, `ADMIN`)
 - Creación de tickets (permitida para `USER` y `ADMIN`; `AGENT` no crea tickets)
@@ -37,6 +40,7 @@ El foco del proyecto está en el backend: autenticación, autorización por role
 - Seed demo realista
 
 ### Frontend (demo)
+
 - Login con JWT
 - Header global en rutas protegidas
 - UI por rol (oculta acciones no permitidas)
@@ -60,6 +64,7 @@ Usa estas credenciales para probar distintos flujos:
 ### Permisos por rol (resumen)
 
 #### USER
+
 - Puede iniciar sesión
 - Puede crear tickets
 - Puede ver solo sus tickets
@@ -69,6 +74,7 @@ Usa estas credenciales para probar distintos flujos:
 - No ve eventos internos
 
 #### AGENT
+
 - Puede iniciar sesión
 - Puede ver tickets
 - Puede comentar público / interno
@@ -78,6 +84,7 @@ Usa estas credenciales para probar distintos flujos:
 - No puede crear tickets
 
 #### ADMIN
+
 - Puede iniciar sesión
 - Puede crear tickets
 - Puede ver tickets
@@ -89,6 +96,7 @@ Usa estas credenciales para probar distintos flujos:
 ## Flujo demo recomendado
 
 ### Flujo 1 (usuario final -> soporte)
+
 1. Iniciar sesión como `user@demo.com`
 2. Ir a **Nuevo ticket**
 3. Crear un ticket con prioridad media o alta
@@ -96,6 +104,7 @@ Usa estas credenciales para probar distintos flujos:
 5. Agregar un mensaje público
 
 ### Flujo 2 (soporte / admin)
+
 1. Cerrar sesión e iniciar como `agent@demo.com` o `admin@demo.com`
 2. Abrir el ticket creado
 3. Asignarte o reasignarlo desde el dropdown
@@ -127,23 +136,31 @@ Swagger local:
 
 - `http://localhost:3000/docs`
 
+Swagger en producción:
+
+- `https://deskflow-cx1c.onrender.com/api/docs`
+
 Notas:
+
 - La API usa JWT Bearer en endpoints protegidos
 - Swagger está configurado para persistir autorización (`persistAuthorization`)
 
 ## Endpoints principales
 
 ### Auth
+
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 
 ### Health / utilidades de prueba
+
 - `GET /api/health`
 - `GET /api/health/db`
 - `GET /api/auth/test/admin`
 - `GET /api/auth/test/support`
 
 ### Tickets
+
 - `POST /api/tickets` (creación de ticket; permitido para `USER` y `ADMIN`)
 - `GET /api/tickets`
 - `GET /api/tickets/:id`
@@ -153,9 +170,11 @@ Notas:
 - `POST /api/tickets/:id/status`
 
 ### Users
+
 - `GET /api/users/assignable`
 
 ### Metrics
+
 - `GET /api/metrics/overview`
 
 ## Requisitos
@@ -191,12 +210,14 @@ Crear `.env` en la raíz del repo (backend) tomando como base `.env.example`.
 ### 4) Ejecutar migraciones y cargar seed demo
 
 #### Opción normal (si ya tenés DB levantada)
+
 ```bash
 pnpm prisma migrate dev
 pnpm seed
 ```
 
 #### Opción reset completo (recomendado para volver al estado demo exacto)
+
 ```bash
 pnpm prisma migrate reset --force
 ```
@@ -208,9 +229,11 @@ pnpm start:dev
 ```
 
 API local:
+
 - `http://localhost:3000/api`
 
 Swagger local:
+
 - `http://localhost:3000/docs`
 
 ## Setup frontend (Next.js demo)
@@ -244,6 +267,7 @@ pnpm dev --port 3001
 ```
 
 Frontend local:
+
 - `http://localhost:3001`
 
 ## Variables de entorno
@@ -302,15 +326,19 @@ docs/images/
 Y referenciarlas acá:
 
 ### Login
+
 ![Login](docs/images/login.png)
 
 ### Lista de tickets
+
 ![Lista de tickets](docs/images/tickets-list.png)
 
 ### Detalle de ticket (timeline + acciones)
+
 ![Detalle de ticket](docs/images/ticket-detail.png)
 
 ### Métricas
+
 ![Métricas](docs/images/metrics.png)
 
 ## Decisión de diseño (resumen)
@@ -325,23 +353,39 @@ Y referenciarlas acá:
 DeskFlow está en una etapa funcional y demostrable como proyecto de portafolio.
 
 Incluye:
+
 - API backend con reglas de negocio y documentación Swagger
 - Frontend de demo para recorrer el flujo principal de tickets
 - Seed demo para pruebas rápidas
+- CI con GitHub Actions (tests + build)
+- Deploy automático en Render (backend) y Vercel (frontend)
+
+## CI/CD
+
+### CI (GitHub Actions)
+
+- Workflow: `.github/workflows/ci.yml`
+- Corre en Pull Requests y en pushes a `main`
+- Ejecuta instalación de dependencias, generación de Prisma Client, tests y build de backend
+
+### CD (Deploy automático)
+
+- Backend: Render (auto-deploy desde `main`)
+- Frontend: Vercel (auto-deploy desde `main`)
+- Flujo recomendado: branch -> PR -> CI en verde -> merge a `main` -> deploy automático
 
 ## Próximos pasos (roadmap corto)
 
-- Deploy backend + DB (Railway / Render)
-- Deploy frontend (Vercel)
-- README final con links públicos
-- Tests backend mínimos (reglas de negocio críticas)
+- Completar tests E2E de flujos críticos
+- Incorporar lint en el gate de CI cuando el baseline esté limpio
+- Mejorar observabilidad (logs y métricas de errores)
 - Pulido extra de UI (opcional)
 
 ## Links (completar después del deploy)
 
-- Demo frontend: `PENDIENTE`
-- Swagger online: `PENDIENTE`
-- API base URL: `PENDIENTE`
+- Demo frontend: `https://desk-flow-iota.vercel.app`
+- Swagger online: `https://deskflow-cx1c.onrender.com/api/docs`
+- API base URL: `https://deskflow-cx1c.onrender.com/api`
 
 ## Licencia
 
