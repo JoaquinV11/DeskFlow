@@ -325,29 +325,39 @@ Podría hacer algo como:
 
 ```text
 docs/images/
-  login.png
-  tickets-list.png
-  ticket-detail.png
-  metrics.png
+  01-login.png
+  02-tickets-list.png
+  03-ticket-details-and-assign-status.png
+  04-ticket-event-timeline.png
+  05-metrics.png
+  06-swagger-docs.png
 ```
 
 Y referenciarlas acá:
 
 ### Login
 
-![Login](docs/images/login.png)
+![Login](docs/images/01-login.png)
 
 ### Lista de tickets
 
-![Lista de tickets](docs/images/tickets-list.png)
+![Lista de tickets](docs/images/02-tickets-list.png)
 
-### Detalle de ticket (timeline + acciones)
+### Detalle de ticket + asignación/estado
 
-![Detalle de ticket](docs/images/ticket-detail.png)
+![Detalle de ticket](docs/images/03-ticket-details-and-assign-status.png)
+
+### Timeline de eventos
+
+![Timeline de eventos](docs/images/04-ticket-event-timeline.png)
 
 ### Métricas
 
-![Métricas](docs/images/metrics.png)
+![Métricas](docs/images/05-metrics.png)
+
+### Swagger (producción)
+
+![Swagger](docs/images/06-swagger-docs.png)
 
 ## Decisión de diseño (resumen)
 

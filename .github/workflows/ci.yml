@@ -10,6 +10,23 @@ jobs:
   backend:
     name: Backend checks
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: deskflow_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d deskflow_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/deskflow_ci?schema=public
+      JWT_SECRET: ci-test-secret
 
     steps:
       - name: Checkout
@@ -30,12 +47,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/deskflow?schema=public
         run: pnpm prisma generate
+
+      - name: Apply database migrations
+        run: pnpm prisma migrate deploy
+
+      - name: Seed database for e2e
+        run: pnpm seed
 
       - name: Run tests
         run: pnpm test --runInBand
+
+      - name: Run e2e tests
+        run: pnpm test:e2e --runInBand
 
       - name: Build backend
         run: pnpm build
