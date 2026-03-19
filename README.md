@@ -1,5 +1,7 @@
 # DeskFlow
 
+[![CI](https://github.com/JoaquinV11/DeskFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaquinV11/DeskFlow/actions/workflows/ci.yml)
+
 DeskFlow es un helpdesk B2B backend-first con API REST en NestJS + Prisma/PostgreSQL y un frontend de demo en Next.js para recorrer el flujo principal del producto (login, tickets, timeline, asignación, cambio de estado y métricas).
 
 El foco del proyecto está en el backend: autenticación, autorización por roles, reglas de negocio del workflow de tickets, timeline con visibilidad pública/interna y métricas operativas. El frontend existe como capa de demo para mostrar el flujo completo.
@@ -279,12 +281,18 @@ Ver `.env.example`. Variables esperadas:
 - `DATABASE_URL` - conexión a PostgreSQL
 - `JWT_SECRET` - clave para firmar JWT
 - `PORT` - puerto del backend (por defecto 3000)
+- `CORS_ORIGINS` - orígenes permitidos para CORS (separados por coma)
 
 ### Frontend (`web/.env.local`)
 
 Ver `web/.env.example`. Variables esperadas:
 
 - `NEXT_PUBLIC_API_URL` - URL base de la API (incluye `/api`)
+
+### Producción
+
+- Backend (Render): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`, `CORS_ORIGINS=https://desk-flow-iota.vercel.app`
+- Frontend (Vercel): `NEXT_PUBLIC_API_URL=https://deskflow-cx1c.onrender.com/api`
 
 ## Docker / Base de datos local
 
@@ -381,7 +389,7 @@ Incluye:
 - Mejorar observabilidad (logs y métricas de errores)
 - Pulido extra de UI (opcional)
 
-## Links (completar después del deploy)
+## Links en producción
 
 - Demo frontend: `https://desk-flow-iota.vercel.app`
 - Swagger online: `https://deskflow-cx1c.onrender.com/api/docs`
