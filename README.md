@@ -38,6 +38,9 @@ El foco del proyecto está en el backend: autenticación, autorización por role
 - Cambio de estado con transiciones válidas
 - Métricas operativas (`api/metrics/overview`)
 - Endpoint de usuarios asignables (`api/users/assignable`)
+- Cola async de jobs con Redis + worker (BullMQ)
+- Reintentos con backoff exponencial para jobs de resumen
+- Idempotencia por `X-Idempotency-Key` en encolado de jobs
 - Swagger con autenticación Bearer
 - Seed demo realista
 
@@ -179,6 +182,11 @@ Notas:
 
 - `GET /api/metrics/overview`
 
+### Jobs async (Redis + worker)
+
+- `POST /api/jobs/ticket-summary` (encola generación de resumen de ticket)
+- `GET /api/jobs/:id` (consulta estado y resultado del job)
+
 ## Requisitos
 
 - Node.js 20+
@@ -282,6 +290,8 @@ Ver `.env.example`. Variables esperadas:
 - `JWT_SECRET` - clave para firmar JWT
 - `PORT` - puerto del backend (por defecto 3000)
 - `CORS_ORIGINS` - orígenes permitidos para CORS (separados por coma)
+- `REDIS_URL` - conexión a Redis para cola de jobs async
+- `JOBS_WORKER_CONCURRENCY` - concurrencia del worker (por defecto 2)
 
 ### Frontend (`web/.env.local`)
 
@@ -291,30 +301,33 @@ Ver `web/.env.example`. Variables esperadas:
 
 ### Producción
 
-- Backend (Render): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`, `CORS_ORIGINS=https://desk-flow-iota.vercel.app`
+- Backend (Render): `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`, `CORS_ORIGINS=https://desk-flow-iota.vercel.app`, `REDIS_URL`
 - Frontend (Vercel): `NEXT_PUBLIC_API_URL=https://deskflow-cx1c.onrender.com/api`
 
 ## Docker / Base de datos local
 
-El proyecto usa PostgreSQL local vía `docker-compose.yml`.
+El proyecto usa PostgreSQL y Redis local vía `docker-compose.yml`.
 
 Comandos útiles:
 
 ```bash
-# Levantar DB
-sudo docker compose up -d
+# Levantar DB + Redis
+docker compose up -d
 
 # Ver contenedores
-sudo docker ps
+docker ps
 
-# Ver logs
-sudo docker compose logs -f db
+# Ver logs DB
+docker compose logs -f db
+
+# Ver logs Redis
+docker compose logs -f redis
 
 # Apagar DB
-sudo docker compose down
+docker compose down
 
 # Apagar y borrar volumen (borra datos)
-sudo docker compose down -v
+docker compose down -v
 ```
 
 ## Capturas (screenshots)
@@ -392,11 +405,54 @@ Incluye:
 - Frontend: Vercel (auto-deploy desde `main`)
 - Flujo recomendado: branch -> PR -> CI en verde -> merge a `main` -> deploy automático
 
+## Operabilidad backend
+
+- Health checks: `GET /api/health` y `GET /api/health/db`
+- Autenticacion: JWT Bearer en endpoints protegidos; Swagger con `persistAuthorization`
+- Persistencia local para desarrollo: PostgreSQL en Docker (`docker compose up -d`)
+- Procesamiento async: cola Redis + worker BullMQ para jobs (`/api/jobs/*`)
+- Reintentos y resiliencia: `attempts=3` con backoff exponencial en jobs async
+- Idempotencia: encabezado `X-Idempotency-Key` para evitar encolado duplicado
+- Logs: salida de NestJS en consola (entorno local); logs de DB via `docker compose logs -f db`
+
+## Flujo async de jobs
+
+```text
+Cliente (AGENT/ADMIN)
+    |
+    | POST /api/jobs/ticket-summary (+ X-Idempotency-Key)
+    v
+API NestJS (JobsController/JobsService)
+    |
+    | Encola en Redis (BullMQ)
+    v
+Queue: deskflow-jobs
+    |
+    | Worker consume con attempts=3 y backoff exponencial
+    v
+JobsWorker -> Prisma (ticket + eventos)
+    |
+    v
+Resultado persisted en job returnvalue
+    |
+    | GET /api/jobs/:id
+    v
+Estado + resultado / error
+```
+
+## Limitaciones conocidas
+
+- Cobertura automatizada principal en backend; el frontend de demo no tiene suite dedicada de tests.
+- Observabilidad aun basica (sin trazas distribuidas ni tablero de metricas de errores).
+- El foco del repo es backend-first; la UI prioriza mostrar flujo funcional sobre profundidad visual.
+- Si `REDIS_URL` no está configurado, los endpoints de jobs async responden `503` (degradación controlada).
+
 ## Próximos pasos (roadmap corto)
 
 - Completar tests E2E de flujos críticos
 - Incorporar lint en el gate de CI cuando el baseline esté limpio
 - Mejorar observabilidad (logs y métricas de errores)
+- Agregar dashboard de jobs (latencia, reintentos, fallos por tipo)
 - Pulido extra de UI (opcional)
 
 ## Links en producción
