@@ -55,6 +55,7 @@ El foco del proyecto está en el backend: autenticación, autorización por role
 - Agregar mensajes (públicos / internos según rol)
 - Asignar / reasignar ticket (incluye "Asignarme")
 - Cambiar estado desde frontend
+- Generar resumen async de ticket desde frontend (Redis + BullMQ)
 - Pantalla de métricas
 - Dark mode (según tema del sistema)
 
@@ -116,7 +117,8 @@ Usa estas credenciales para probar distintos flujos:
 4. Cambiar estado (`OPEN -> IN_PROGRESS -> WAITING_USER` o `CLOSED`)
 5. Agregar una nota interna
 6. Ver el timeline actualizado
-7. Ir a **Métricas** y revisar el resumen
+7. Generar un **Resumen async** desde el detalle del ticket y consultar su estado
+8. Ir a **Métricas** y revisar el resumen
 
 ## Arquitectura y estructura del repo
 

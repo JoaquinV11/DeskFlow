@@ -55,6 +55,44 @@ type AssignableUser = {
   role: 'AGENT' | 'ADMIN';
 };
 
+type JobState =
+  | 'waiting'
+  | 'active'
+  | 'completed'
+  | 'failed'
+  | 'delayed'
+  | 'paused'
+  | 'waiting-children';
+
+type TicketSummaryResult = {
+  generatedAt: string;
+  ticket: {
+    id: string;
+    title: string;
+    status: TicketStatus;
+    priority: TicketPriority;
+    createdAt: string;
+    updatedAt: string;
+  };
+  owner: { id: string; email: string; name: string; role: Role };
+  assignee: { id: string; email: string; name: string; role: Role } | null;
+  events: {
+    total: number;
+    public: number;
+    internal: number;
+  };
+};
+
+type TicketSummaryJob = {
+  id: string;
+  name: string;
+  state: JobState | string;
+  attemptsMade: number;
+  created: boolean;
+  result: TicketSummaryResult | null;
+  failedReason: string | null;
+};
+
 const STATUS_LABELS: Record<string, string> = {
   OPEN: 'Abierto',
   IN_PROGRESS: 'En progreso',
@@ -75,6 +113,27 @@ const ALLOWED_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   WAITING_USER: ['IN_PROGRESS', 'CLOSED', 'CANCELLED'],
   CLOSED: [],
   CANCELLED: [],
+};
+
+const JOB_STATE_LABELS: Record<string, string> = {
+  waiting: 'En cola',
+  active: 'Procesando',
+  completed: 'Completado',
+  failed: 'Fallido',
+  delayed: 'Programado',
+  paused: 'Pausado',
+  'waiting-children': 'Esperando subtareas',
+};
+
+const JOB_STATE_STYLES: Record<string, string> = {
+  waiting:
+    'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300',
+  active:
+    'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300',
+  completed:
+    'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300',
+  failed:
+    'border-red-200 bg-red-50 text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300',
 };
 
 export default function TicketDetailPage() {
@@ -105,6 +164,12 @@ export default function TicketDetailPage() {
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
   const [assigningSelected, setAssigningSelected] = useState(false);
+
+  const [creatingSummaryJob, setCreatingSummaryJob] = useState(false);
+  const [summaryJob, setSummaryJob] = useState<TicketSummaryJob | null>(null);
+  const [summaryJobId, setSummaryJobId] = useState<string | null>(null);
+  const [summaryJobError, setSummaryJobError] = useState<string | null>(null);
+  const [summaryUpdatedAt, setSummaryUpdatedAt] = useState<string | null>(null);
 
   const allowedNextStatuses = useMemo(() => {
     if (!ticket) return [];
@@ -320,6 +385,91 @@ export default function TicketDetailPage() {
       setAssigningSelected(false);
     }
   }
+
+  async function loadSummaryJobStatus(jobId: string, silent = false) {
+    if (!silent) {
+      setSummaryJobError(null);
+    }
+
+    try {
+      const status = await apiFetch<TicketSummaryJob>(`/jobs/${jobId}`);
+      setSummaryJob(status);
+      setSummaryJobId(status.id);
+      setSummaryUpdatedAt(new Date().toISOString());
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'No se pudo consultar el estado del job';
+
+      if (message.toLowerCase().includes('unauthorized')) {
+        clearToken();
+        router.push('/login');
+        return;
+      }
+
+      if (!silent) {
+        setSummaryJobError(message);
+      }
+    }
+  }
+
+  async function onCreateSummaryJob() {
+    if (!ticket || !currentUser || currentUser.role === 'USER') {
+      return;
+    }
+
+    setCreatingSummaryJob(true);
+    setSummaryJobError(null);
+
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `deskflow-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    try {
+      const job = await apiFetch<TicketSummaryJob>('/jobs/ticket-summary', {
+        method: 'POST',
+        headers: {
+          'x-idempotency-key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+        }),
+      });
+
+      setSummaryJob(job);
+      setSummaryJobId(job.id);
+      setSummaryUpdatedAt(new Date().toISOString());
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'No se pudo crear el job de resumen';
+
+      if (message.toLowerCase().includes('unauthorized')) {
+        clearToken();
+        router.push('/login');
+        return;
+      }
+
+      setSummaryJobError(message);
+    } finally {
+      setCreatingSummaryJob(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!summaryJobId) {
+      return;
+    }
+
+    if (summaryJob?.state === 'completed' || summaryJob?.state === 'failed') {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      void loadSummaryJobStatus(summaryJobId, true);
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [summaryJobId, summaryJob?.state]);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -602,6 +752,112 @@ export default function TicketDetailPage() {
                   </button>
                 </div>
               </form>
+            )}
+          </section>
+        )}
+
+        {currentUser && currentUser.role !== 'USER' && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100">Generar resumen</h2>
+              <p className="text-sm text-gray-600 dark:text-zinc-400">
+                Procesa el resumen en segundo plano. Podés seguir trabajando mientras se completa.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onCreateSummaryJob}
+                disabled={creatingSummaryJob}
+                className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+              >
+                {creatingSummaryJob ? 'Generando...' : 'Generar resumen'}
+              </button>
+            </div>
+
+            {summaryJobError && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                {summaryJobError}
+              </div>
+            )}
+
+            {summaryJob && (
+              <div className="mt-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      JOB_STATE_STYLES[summaryJob.state] ??
+                      'border-gray-300 bg-gray-50 text-gray-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                    }`}
+                  >
+                    {JOB_STATE_LABELS[summaryJob.state] ?? summaryJob.state}
+                  </span>
+                  {summaryUpdatedAt && (
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      Actualizado: {new Date(summaryUpdatedAt).toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+
+                {summaryJob.state === 'failed' && summaryJob.failedReason && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+                    {summaryJob.failedReason}
+                  </div>
+                )}
+
+                {summaryJob.result && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                      {summaryJob.result.ticket.title}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600 dark:text-zinc-400">
+                      Resumen generado el {new Date(summaryJob.result.generatedAt).toLocaleString()}
+                    </p>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-lg border border-emerald-200/70 bg-white/70 p-2 dark:border-emerald-900/40 dark:bg-zinc-900/40">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-zinc-400">Eventos</p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">
+                          {summaryJob.result.events.total}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200/70 bg-white/70 p-2 dark:border-emerald-900/40 dark:bg-zinc-900/40">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-zinc-400">Publicos</p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">
+                          {summaryJob.result.events.public}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200/70 bg-white/70 p-2 dark:border-emerald-900/40 dark:bg-zinc-900/40">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-zinc-400">Internos</p>
+                        <p className="text-base font-semibold text-gray-900 dark:text-zinc-100">
+                          {summaryJob.result.events.internal}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200/70 bg-white/70 p-2 dark:border-emerald-900/40 dark:bg-zinc-900/40">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-zinc-400">Asignado a</p>
+                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-zinc-100">
+                          {summaryJob.result.assignee?.name ?? 'Sin asignar'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <details className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-400">
+                  <summary className="cursor-pointer select-none font-medium text-gray-700 dark:text-zinc-300">
+                    Detalles tecnicos
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    <p className="break-all">
+                      <span className="font-medium">Job ID:</span> {summaryJob.id}
+                    </p>
+                    <p>
+                      <span className="font-medium">Reintentos usados:</span> {summaryJob.attemptsMade}
+                    </p>
+                  </div>
+                </details>
+              </div>
             )}
           </section>
         )}
